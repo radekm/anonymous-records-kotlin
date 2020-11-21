@@ -106,5 +106,88 @@ If want to still use this library you should know about its limitations:
 
 ## Alternatives in Kotlin
 
-TODO:
-- delegated properties
+If you want to use inheritance you must avoid data classes.
+By avoiding data classes you lose automatic implementation
+of `equals`, `hashCode`, `toString` and `copy`.
+First 3 can be easily recovered by storing property values
+in the `Map`:
+
+```kotlin
+import kotlin.reflect.KProperty
+
+class PropertyDelegate<T>() {
+    operator fun getValue(rec: Record, prop: KProperty<*>): T {
+        @Suppress("UNCHECKED_CAST")
+        return rec.data[prop.name] as T
+    }
+    operator fun setValue(rec: Record, prop: KProperty<*>, v: T) {
+        rec.data[prop.name] = v
+    }
+}
+
+class DelegateProvider<T> {
+    operator fun provideDelegate(
+        record: Record,
+        prop: KProperty<*>
+    ): PropertyDelegate<T> {
+        record.fields.add(prop.name)
+        return PropertyDelegate()
+    }
+}
+
+typealias FieldName = String
+
+abstract class Record {
+    internal val fields = mutableSetOf<FieldName>()
+    internal val data = mutableMapOf<FieldName, Any?>()
+    fun <T> field(): DelegateProvider<T> = DelegateProvider()
+
+    override fun equals(other: Any?): Boolean = other is Record && other.fields == fields && other.data == data
+    override fun hashCode(): Int = arrayOf(fields, data).contentHashCode()
+    override fun toString(): String = fields.toList().sorted().joinToString(prefix = "Record(", postfix = ")") { field ->
+        if (field in data) "$field -> ${data[field]}"
+        else "$field -> <undefined>"
+    }
+}
+```
+
+Now you can define records for users:
+
+```kotlin
+open class User : Record() {
+    var name: String by field()
+    var group: String by field()
+}
+
+open class UserWithId : User() {
+    var id: Int by field()
+}
+```
+
+This is simpler than our library and has advantage that
+you can use `UserWithId` in place of `User`.
+ 
+On the other hand code for creating a new record is slightly longer:
+
+```kotlin
+val user = User().apply {
+    name = "Joanna"
+    group = "dev"
+}
+```
+
+The real problem is that constructor which would force you
+at compile time to initialize all fields is not created
+and you can easily forget to initialize a field:
+
+```kotlin
+val userWithId = UserWithId().apply {
+    name = "Joanna"
+    group = "dev"
+}
+```
+
+Operators `+`, `-` and `copy` function are missing.
+The inheritance allows you to use `UserWithId` in place of `User`
+but not vice versa. If you have `User` and need `UserWithId`
+you have to create it from scratch.
