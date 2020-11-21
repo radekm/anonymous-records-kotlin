@@ -3,10 +3,11 @@ import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 plugins {
     kotlin("jvm") version "1.4.10"
+    `maven-publish`
 }
 
-group = "me.radekm"
-version = "1.0-SNAPSHOT"
+group = "cz.radekm.records"
+version = "0.1"
 
 repositories {
     mavenCentral()
@@ -15,7 +16,6 @@ repositories {
 dependencies {
     testImplementation(kotlin("test-junit5"))
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.7.0")
-
 }
 
 tasks.withType<KotlinCompile>() {
@@ -32,5 +32,18 @@ tasks.test {
             TestLogEvent.FAILED
         )
         showStandardStreams = true
+    }
+}
+
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+        }
     }
 }
