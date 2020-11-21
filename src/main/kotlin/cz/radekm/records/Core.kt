@@ -64,9 +64,10 @@ open class Field<T>(val id: String, val type: FieldType<T>) {
  */
 infix fun <T, F : Field<T>> F.to(value: T): Binding<T, F> = Binding(this, value)
 
-class Binding<T, F : Field<T>>(val field: F, val value: T)
+data class Binding<T, F : Field<T>>(val field: F, val value: T) {
+    override fun toString() = "${field.id} -> $value"
+}
 
-// TODO Equality and hashing.
 // TODO Functions for adding and removing multiple fields at once.
 class RecordData private constructor(private val bindings: Array<Binding<*, *>>) {
     val size: Int
@@ -112,7 +113,12 @@ class RecordData private constructor(private val bindings: Array<Binding<*, *>>)
         return RecordData(newBindings)
     }
 
-    override fun toString(): String = bindings.joinToString { "${it.field.id} -> ${it.value}" }
+    override fun equals(other: Any?): Boolean = other is RecordData &&
+            bindings.contentEquals(other.bindings)
+
+    override fun hashCode(): Int = bindings.contentHashCode()
+
+    override fun toString(): String = bindings.joinToString()
 
     companion object {
         operator fun invoke(vararg bindings: Binding<*, *>): RecordData {
@@ -128,10 +134,15 @@ class RecordData private constructor(private val bindings: Array<Binding<*, *>>)
     }
 }
 
-open class Record protected constructor(val data: RecordData) {
+// This could be sealed but then the generated code has to be in the same file.
+abstract class Record protected constructor(val data: RecordData) {
+    override fun equals(other: Any?): Boolean = other is Record && data == other.data
+    override fun hashCode(): Int = data.hashCode()
     override fun toString(): String = "Record($data)"
 }
 
 object Record0 : Record(RecordData()) {
     operator fun <T, F : Field<T>> plus(binding: Binding<T, F>): Record1<F> = Record1(data + binding)
 }
+
+fun record(): Record0 = Record0
